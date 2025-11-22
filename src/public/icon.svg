@@ -1,0 +1,64 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Black Background -->
+  <rect width="512" height="512" fill="#000000"/>
+  
+  <!-- Left Lens - Reality (White) -->
+  <circle 
+    cx="192" 
+    cy="256" 
+    r="100" 
+    stroke="white" 
+    stroke-width="16" 
+    fill="none"
+  />
+  <circle 
+    cx="192" 
+    cy="256" 
+    r="55" 
+    fill="white" 
+    opacity="0.3"
+  />
+  
+  <!-- Right Lens - Parallel World (Yellow) -->
+  <circle 
+    cx="320" 
+    cy="256" 
+    r="100" 
+    stroke="#FFFC00" 
+    stroke-width="16" 
+    fill="none"
+  />
+  <circle 
+    cx="320" 
+    cy="256" 
+    r="55" 
+    fill="#FFFC00" 
+    opacity="0.4"
+  />
+  
+  <!-- Connection Line - Parallel Bridge -->
+  <line 
+    x1="265" 
+    y1="256" 
+    x2="220" 
+    y2="256" 
+    stroke="white" 
+    stroke-width="12" 
+    opacity="0.5" 
+    stroke-dasharray="12 12"
+  />
+  
+  <!-- Sparkle Effect (Top Right) -->
+  <path 
+    d="M380 140 L390 160 L410 170 L390 180 L380 200 L370 180 L350 170 L370 160 Z" 
+    fill="#FFFC00"
+    opacity="0.9"
+  />
+  
+  <!-- Additional Sparkle (Bottom Left) -->
+  <path 
+    d="M140 350 L145 360 L155 365 L145 370 L140 380 L135 370 L125 365 L135 360 Z" 
+    fill="white"
+    opacity="0.6"
+  />
+</svg>

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>平行相机 - PWA 图标生成器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 900px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 24px;
+      padding: 40px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    h1 {
+      font-size: 2rem;
+      font-weight: 900;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, white 0%, #FFFC00 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 40px;
+      font-size: 0.9rem;
+    }
+    
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    
+    .preview-card {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .preview-card h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    
+    .icon-preview {
+      width: 100%;
+      aspect-ratio: 1;
+      margin-bottom: 16px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    
+    .btn {
+      background: #FFFC00;
+      color: black;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+    
+    .btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 16px rgba(255, 252, 0, 0.3);
+    }
+    
+    .btn:active {
+      transform: scale(0.98);
+    }
+    
+    .instructions {
+      background: rgba(255, 252, 0, 0.1);
+      border: 1px solid rgba(255, 252, 0, 0.2);
+      border-radius: 16px;
+      padding: 24px;
+      margin-top: 40px;
+    }
+    
+    .instructions h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      color: #FFFC00;
+    }
+    
+    .instructions ol {
+      margin-left: 20px;
+      line-height: 1.8;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .instructions code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #FFFC00;
+    }
+    
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 平行相机 PWA 图标生成器</h1>
+    <p class="subtitle">生成适用于 iOS/Android 主屏幕的应用图标</p>
+    
+    <div class="preview-grid">
+      <!-- 192x192 Icon -->
+      <div class="preview-card">
+        <h3>192 × 192 (Android)</h3>
+        <div class="icon-preview">
+          <canvas id="canvas192" width="192" height="192"></canvas>
+        </div>
+        <button class="btn" onclick="downloadIcon(192)">下载 192×192</button>
+      </div>
+      
+      <!-- 512x512 Icon -->
+      <div class="preview-card">
+        <h3>512 × 512 (Android)</h3>
+        <div class="icon-preview">
+          <canvas id="canvas512" width="512" height="512"></canvas>
+        </div>
+        <button class="btn" onclick="downloadIcon(512)">下载 512×512</button>
+      </div>
+      
+      <!-- 180x180 Icon (Apple) -->
+      <div class="preview-card">
+        <h3>180 × 180 (iOS)</h3>
+        <div class="icon-preview">
+          <canvas id="canvas180" width="180" height="180"></canvas>
+        </div>
+        <button class="btn" onclick="downloadIcon(180)">下载 180×180</button>
+      </div>
+    </div>
+    
+    <div class="instructions">
+      <h2>📋 使用说明</h2>
+      <ol>
+        <li>点击上方按钮下载对应尺寸的图标</li>
+        <li>将 <code>icon-192.png</code> 和 <code>icon-512.png</code> 保存到项目的 <code>/public</code> 目录</li>
+        <li>将 <code>apple-touch-icon.png</code> (180×180) 保存到 <code>/public</code> 目录</li>
+        <li>确保 <code>/public/manifest.json</code> 中的图标路径正确</li>
+        <li>部署到 Vercel 后，在移动设备上访问网站</li>
+        <li>iOS: 点击分享 → 添加到主屏幕</li>
+        <li>Android: 点击菜单 → 安装应用 或 添加到主屏幕</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    // 绘制平行相机 Logo
+    function drawLogo(canvas, size) {
+      const ctx = canvas.getContext('2d');
+      const scale = size / 512; // 基于512px设计
+      
+      // 清空画布
+      ctx.clearRect(0, 0, size, size);
+      
+      // 黑色背景
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, size, size);
+      
+      // 缩放所有绘制操作
+      ctx.save();
+      ctx.scale(scale, scale);
+      
+      // 左镜片 - 现实世界 (白色)
+      ctx.beginPath();
+      ctx.arc(192, 256, 100, 0, Math.PI * 2);
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 16;
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.arc(192, 256, 55, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.fill();
+      
+      // 右镜片 - 平行世界 (黄色)
+      ctx.beginPath();
+      ctx.arc(320, 256, 100, 0, Math.PI * 2);
+      ctx.strokeStyle = '#FFFC00';
+      ctx.lineWidth = 16;
+      ctx.stroke();
+      
+      ctx.beginPath();
+      ctx.arc(320, 256, 55, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 252, 0, 0.4)';
+      ctx.fill();
+      
+      // 连接线 - 虚线
+      ctx.beginPath();
+      ctx.setLineDash([12, 12]);
+      ctx.moveTo(220, 256);
+      ctx.lineTo(265, 256);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.lineWidth = 12;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // 闪光效果 (右上)
+      ctx.beginPath();
+      ctx.moveTo(380, 140);
+      ctx.lineTo(390, 160);
+      ctx.lineTo(410, 170);
+      ctx.lineTo(390, 180);
+      ctx.lineTo(380, 200);
+      ctx.lineTo(370, 180);
+      ctx.lineTo(350, 170);
+      ctx.lineTo(370, 160);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255, 252, 0, 0.9)';
+      ctx.fill();
+      
+      // 小闪光 (左下)
+      ctx.beginPath();
+      ctx.moveTo(140, 350);
+      ctx.lineTo(145, 360);
+      ctx.lineTo(155, 365);
+      ctx.lineTo(145, 370);
+      ctx.lineTo(140, 380);
+      ctx.lineTo(135, 370);
+      ctx.lineTo(125, 365);
+      ctx.lineTo(135, 360);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.fill();
+      
+      ctx.restore();
+    }
+    
+    // 下载图标
+    function downloadIcon(size) {
+      const canvas = document.getElementById(`canvas${size}`);
+      const link = document.createElement('a');
+      
+      let filename;
+      if (size === 180) {
+        filename = 'apple-touch-icon.png';
+      } else {
+        filename = `icon-${size}.png`;
+      }
+      
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+    
+    // 页面加载时生成所有图标
+    window.addEventListener('load', () => {
+      drawLogo(document.getElementById('canvas192'), 192);
+      drawLogo(document.getElementById('canvas512'), 512);
+      drawLogo(document.getElementById('canvas180'), 180);
+    });
+  </script>
+</body>
+</html>
