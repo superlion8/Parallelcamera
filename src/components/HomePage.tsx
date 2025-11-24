@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Camera, Trash2, MapPin, X, Sparkles, Zap, Users } from 'lucide-react';
+import { Camera, Trash2, MapPin, X, Sparkles, Zap, Users, LogIn, LogOut } from 'lucide-react';
+import { Session } from '@supabase/supabase-js';
 import { GeneratedResult } from '../App';
 import { Logo } from './Logo';
 import { CharacterManager } from './CharacterManager';
@@ -8,11 +9,23 @@ interface HomePageProps {
   onStartCamera: () => void;
   history: GeneratedResult[];
   onDeleteHistory: (index: number) => void;
+  session: Session | null;
+  onLogin: () => void;
+  onLogout: () => void;
+  debugInfo?: string;
 }
 
-export function HomePage({ onStartCamera, history, onDeleteHistory }: HomePageProps) {
+export function HomePage({ onStartCamera, history, onDeleteHistory, session, onLogin, onLogout, debugInfo }: HomePageProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [showCharacterManager, setShowCharacterManager] = useState(false);
+
+  const handleStartClick = () => {
+    if (session) {
+      onStartCamera();
+    } else {
+      onLogin();
+    }
+  };
 
   return (
     <div className="h-full w-full bg-black overflow-y-auto">
@@ -21,21 +34,31 @@ export function HomePage({ onStartCamera, history, onDeleteHistory }: HomePagePr
         <div className="flex items-center justify-between">
           <Logo size="sm" showText={false} />
           <div className="flex items-center gap-2">
-            {/* Character Manager Button */}
+            {session && (
+              <>
+                <button
+                  onClick={onLogout}
+                  className="p-2 bg-white/10 text-white rounded-full active:scale-95 transition-transform hover:bg-white/20"
+                  title="登出"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setShowCharacterManager(true)}
+                  className="px-3 py-2 bg-white/10 text-white rounded-full active:scale-95 transition-transform flex items-center gap-2 border border-white/20 hover:bg-white/20"
+                >
+                  <Users className="w-4 h-4" />
+                  <span className="text-sm">角色</span>
+                </button>
+              </>
+            )}
+            {/* Camera/Login Button */}
             <button
-              onClick={() => setShowCharacterManager(true)}
-              className="px-3 py-2 bg-white/10 text-white rounded-full active:scale-95 transition-transform flex items-center gap-2 border border-white/20 hover:bg-white/20"
+              onClick={handleStartClick}
+              className={`px-4 py-2 ${session ? 'bg-[#FFFC00] text-black' : 'bg-white text-black'} font-bold rounded-full active:scale-95 transition-transform flex items-center gap-2`}
             >
-              <Users className="w-4 h-4" />
-              <span className="text-sm">角色</span>
-            </button>
-            {/* Camera Button */}
-            <button
-              onClick={onStartCamera}
-              className="px-4 py-2 bg-[#FFFC00] text-black font-bold rounded-full active:scale-95 transition-transform flex items-center gap-2"
-            >
-              <Camera className="w-4 h-4" />
-              <span>拍摄</span>
+              {session ? <Camera className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
+              <span>{session ? '拍摄' : '登录'}</span>
             </button>
           </div>
         </div>
@@ -53,14 +76,15 @@ export function HomePage({ onStartCamera, history, onDeleteHistory }: HomePagePr
               欢迎来到平行世界
             </h2>
             <p className="text-white/60 mb-8 max-w-xs">
-              拍摄一张照片，让AI为你创造一个平行宇宙
+              {session ? '拍摄一张照片，让AI为你创造一个平行宇宙' : '请先登录以开始您的平行宇宙之旅'}
             </p>
             
             <button
-              onClick={onStartCamera}
-              className="px-8 py-4 bg-[#FFFC00] text-black font-bold rounded-full active:scale-95 transition-transform text-lg"
+              onClick={handleStartClick}
+              className={`px-8 py-4 ${session ? 'bg-[#FFFC00] text-black' : 'bg-white text-black'} font-bold rounded-full active:scale-95 transition-transform text-lg flex items-center gap-2`}
             >
-              开始拍摄
+              {!session && <LogIn className="w-5 h-5" />}
+              {session ? '开始拍摄' : '使用 Google 登录'}
             </button>
 
             {/* Features */}
@@ -78,6 +102,15 @@ export function HomePage({ onStartCamera, history, onDeleteHistory }: HomePagePr
                 <div className="text-white/80 text-xs font-medium">Meta 模式</div>
               </div>
             </div>
+
+            {/* Debug Info */}
+            {debugInfo && (
+              <div className="mt-8 p-4 bg-red-900/50 border border-red-500/50 rounded-xl max-w-md w-full overflow-x-auto">
+                <p className="text-red-200 text-xs font-mono whitespace-pre-wrap break-all text-left">
+                  {debugInfo}
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           /* Feed - BeReal style */

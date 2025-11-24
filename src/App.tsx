@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Session } from '@supabase/supabase-js';
+import { supabase } from './utils/supabase/client';
 import { HomePage } from './components/HomePage';
 import { CameraView } from './components/CameraView';
 import { MetaPromptView } from './components/MetaPromptView';
@@ -63,6 +65,69 @@ export default function App() {
   const [result, setResult] = useState<GeneratedResult | null>(null);
   const [history, setHistory] = useState<GeneratedResult[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [session, setSession] = useState<Session | null>(null);
+
+  // Auth handling
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+  useEffect(() => {
+    // Capture initial URL
+    setDebugInfo(`Initial URL: ${window.location.href}`);
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('Auth State Changed:', _event);
+      if (session) {
+         setSession(session);
+         setDebugInfo(prev => prev + `\nAuth Success! User: ${session.user.email}`);
+         // Clean URL after successful auth
+         window.history.replaceState({}, '', window.location.pathname);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    console.log('Starting login using HARDCODED redirect...');
+    
+    // Check LocalStorage support
+    try {
+      window.localStorage.setItem('supabase.auth.test', 'ok');
+      window.localStorage.removeItem('supabase.auth.test');
+    } catch (e) {
+      alert('您的浏览器似乎禁用了 LocalStorage，这会导致登录失败。请检查隐私设置。');
+      return;
+    }
+
+    // EXPLICITLY use the trailing slash version.
+    // This prevents the server from 301 redirecting and stripping query params.
+    const redirectUrl = 'https://chorus-poker-31416733.figma.site/';
+    
+    setDebugInfo(`Initiating login...\nRedirect URL: ${redirectUrl}`);
+    
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+    
+    if (error) {
+      console.error('Login error:', error);
+      alert('登录失败: ' + error.message);
+      setDebugInfo(prev => prev + '\nLogin Error: ' + error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
   // Register PWA service worker
   useEffect(() => {
@@ -119,6 +184,10 @@ export default function App() {
   };
 
   const handleStartCamera = () => {
+    if (!session) {
+      handleLogin();
+      return;
+    }
     setAppState('camera');
   };
 
@@ -170,6 +239,10 @@ export default function App() {
           onStartCamera={handleStartCamera}
           history={history}
           onDeleteHistory={deleteFromHistory}
+          session={session}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+          debugInfo={debugInfo}
         />
       )}
       {appState === 'camera' && (
