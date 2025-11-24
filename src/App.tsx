@@ -74,15 +74,27 @@ export default function App() {
     // Capture initial URL
     setDebugInfo(`Initial URL: ${window.location.href}`);
 
+    // 主动获取当前 session（这会触发 URL 参数的解析）
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session);
+      setSession(session);
+      if (session) {
+        setDebugInfo(prev => prev + `\nInitial Session Found! User: ${session.user.email}`);
+        // Clean URL after successful auth
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    });
+
+    // 监听后续的认证状态变化
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('Auth State Changed:', _event);
+      console.log('Auth State Changed:', _event, session);
+      setSession(session);
       if (session) {
-         setSession(session);
-         setDebugInfo(prev => prev + `\nAuth Success! User: ${session.user.email}`);
-         // Clean URL after successful auth
-         window.history.replaceState({}, '', window.location.pathname);
+        setDebugInfo(prev => prev + `\nAuth Success! User: ${session.user.email}`);
+        // Clean URL after successful auth
+        window.history.replaceState({}, '', window.location.pathname);
       }
     });
 
