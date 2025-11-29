@@ -1,52 +1,61 @@
-// 语音转文字 - 使用 Gemini API
-export async function speechToText(audioBase64: string): Promise<string> {
-  const apiKey = Deno.env.get('GEMINI_API_KEY');
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY not configured');
-  }
+// Fix for import issues: Use default import and destructure
+// We support both 'Client' (standard) and 'GoogleGenAI' (legacy/alias) class names
+import genai from "npm:@google/genai";
 
-  console.log('🎤 开始语音识别，音频大小:', audioBase64.length);
+// Set environment variable for Vertex AI mode as requested by user
+try {
+  Deno.env.set("GOOGLE_GENAI_USE_VERTEXAI", "true");
+} catch (e) {
+  // Ignore
+}
+
+// Destructure safely
+const Client = genai.Client || genai.GoogleGenAI;
+
+export async function speechToText(audioBase64: string): Promise<string> {
+  console.log('🎤 Starting speech recognition (SDK Mode - @google/genai)...');
 
   try {
-    // 使用 Gemini 2.0 Flash 进行音频识别
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: '请将这段音频转换为文字。只输出识别出的文字内容，不要添加任何其他说明。如果是中文，请输出中文。'
-              },
-              {
-                inline_data: {
-                  mime_type: 'audio/webm',
-                  data: audioBase64
-                }
-              }
-            ]
-          }]
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Gemini API 错误:', errorText);
-      throw new Error(`Gemini API error: ${response.status} ${errorText}`);
+    const apiKey = Deno.env.get("vertex_api_key");
+    if (!apiKey) {
+      throw new Error("Missing 'vertex_api_key' environment variable.");
     }
 
-    const data = await response.json();
-    console.log('✅ Gemini 响应:', JSON.stringify(data).substring(0, 200));
+    // Initialize Client
+    if (!Client) {
+        console.error("Available exports in @google/genai:", Object.keys(genai));
+        throw new Error("Google GenAI Client class not found in package exports.");
+    }
 
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    console.log('📝 识别结果:', text);
+    // Use vertexai: true in constructor explicitly as well
+    const client = new Client({
+        vertexai: true,
+        apiKey: apiKey,
+        httpOptions: { apiVersion: "v1beta" }
+    });
 
+    // Call Gemini 3.0 Pro Preview
+    const response = await client.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: [{
+        role: "user",
+        parts: [
+          { text: '请将这段音频转换为文字。只输出识别出的文字内容，不要添加任何其他说明。如果是中文，请输出中文。' },
+          { inlineData: { mimeType: 'audio/webm', data: audioBase64 } }
+        ]
+      }]
+    });
+
+    // Extract text
+    const text = response.text || 
+                 (response.candidates && response.candidates[0]?.content?.parts?.[0]?.text) || 
+                 "";
+                 
+    console.log('📝 STT Result:', text.substring(0, 50));
     return text.trim();
+
   } catch (error) {
-    console.error('❌ 语音识别失败:', error);
+    console.error('❌ STT Error:', error);
     throw error;
   }
 }

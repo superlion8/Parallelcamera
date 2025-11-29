@@ -74,15 +74,36 @@ export default function App() {
     // Capture initial URL
     setDebugInfo(`Initial URL: ${window.location.href}`);
 
+    // 1. Initial Session Check (Crucial for OAuth callback)
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Error checking initial session:', error);
+        setDebugInfo(prev => prev + `\nInitial Session Error: ${error.message}`);
+      } else if (session) {
+        console.log('Initial session found:', session.user.email);
+        setSession(session);
+        setDebugInfo(prev => prev + `\nInitial Session Found: ${session.user.email}`);
+        // Clean URL if we have a session (likely from OAuth)
+        window.history.replaceState({}, '', window.location.pathname);
+      } else {
+        console.log('No initial session.');
+        setDebugInfo(prev => prev + '\nNo initial session found.');
+      }
+    });
+
+    // 2. Subscribe to Auth Changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('Auth State Changed:', _event);
+      console.log('Auth State Changed:', _event, session);
+      
+      // ALWAYS update session state, whether it's null or a valid session
+      setSession(session);
+
       if (session) {
-         setSession(session);
-         setDebugInfo(prev => prev + `\nAuth Success! User: ${session.user.email}`);
-         // Clean URL after successful auth
-         window.history.replaceState({}, '', window.location.pathname);
+         setDebugInfo(prev => prev + `\nAuth Event (${_event}): Success! User: ${session.user.email}`);
+      } else {
+         setDebugInfo(prev => prev + `\nAuth Event (${_event}): No Session`);
       }
     });
 
@@ -184,10 +205,11 @@ export default function App() {
   };
 
   const handleStartCamera = () => {
-    if (!session) {
-      handleLogin();
-      return;
-    }
+    // Bypass login check
+    // if (!session) {
+    //   handleLogin();
+    //   return;
+    // }
     setAppState('camera');
   };
 
@@ -239,7 +261,7 @@ export default function App() {
           onStartCamera={handleStartCamera}
           history={history}
           onDeleteHistory={deleteFromHistory}
-          session={session}
+          session={session || { user: { email: 'guest@example.com' } } as any}
           onLogin={handleLogin}
           onLogout={handleLogout}
           debugInfo={debugInfo}
