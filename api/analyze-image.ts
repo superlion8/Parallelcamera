@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getGenAIClient, extractText } from './lib/genai';
 
 export const config = {
-  maxDuration: 60, // 60 seconds timeout for AI operations
+  maxDuration: 60,
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -49,24 +49,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parts.push({ inlineData: { mimeType: 'image/jpeg', data: charBase64 } });
     }
 
-    // Try primary model, fallback to secondary
-    let response;
+    // 使用支持视觉的模型
+    let model;
+    let result;
+    
     try {
-      console.log('Attempting to use model: gemini-3-pro-preview');
-      response = await client.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: [{ role: 'user', parts }],
-      });
+      console.log('Attempting to use model: gemini-1.5-flash');
+      model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      result = await model.generateContent(parts);
     } catch (e: any) {
       console.warn(`Primary model failed: ${e.message}`);
-      console.log('Falling back to gemini-2.0-flash-exp');
-      response = await client.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
-        contents: [{ role: 'user', parts }],
-      });
+      console.log('Falling back to gemini-1.5-pro');
+      model = client.getGenerativeModel({ model: 'gemini-1.5-pro' });
+      result = await model.generateContent(parts);
     }
 
-    const description = extractText(response);
+    const description = result.response.text();
     console.log('Analysis complete. Length:', description.length);
 
     return res.status(200).json({ description });
@@ -75,4 +73,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Failed to analyze image', details: error.message });
   }
 }
-
