@@ -3,27 +3,24 @@ import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.tsx";
 import { speechToText } from "./speech.tsx";
-import genai from "npm:@google/genai";
+import * as genaiModule from "npm:@google/genai";
 
-// Ensure Vertex AI mode is enabled via environment variable as per user snippet
-try {
-  Deno.env.set("GOOGLE_GENAI_USE_VERTEXAI", "true");
-} catch (e) {
-  // Ignore if permission denied or already set
-}
+// Robustly extract Client and types
+const Client = genaiModule.Client || 
+               genaiModule.GoogleGenAI || 
+               (genaiModule.default as any)?.Client || 
+               (genaiModule.default as any)?.GoogleGenAI;
 
-// Destructure/Fallback for Client class
-// The package @google/genai (v0.x) usually exports 'Client'.
-// The user's snippet uses 'GoogleGenAI', so we check for both.
-const Client = genai.Client || genai.GoogleGenAI;
-const { HarmCategory, HarmBlockThreshold } = genai;
+const HarmCategory = genaiModule.HarmCategory || 
+                     (genaiModule.default as any)?.HarmCategory;
+
+const HarmBlockThreshold = genaiModule.HarmBlockThreshold || 
+                           (genaiModule.default as any)?.HarmBlockThreshold;
 
 const app = new Hono();
 
-// Enable logger
 app.use('*', logger(console.log));
 
-// Enable CORS
 app.use(
   "/*",
   cors({
@@ -37,29 +34,55 @@ app.use(
 
 // Helper to get configured client
 function getClient() {
-  const apiKey = Deno.env.get("vertex_api_key");
+  // 1. Retrieve Secrets
+  const apiKey = Deno.env.get("vertex_api_key") || Deno.env.get("VERTEX_API_KEY");
+  const projectId = Deno.env.get("vertex_project_id") || Deno.env.get("VERTEX_PROJECT_ID");
+  
   if (!apiKey) {
-    throw new Error("Missing 'vertex_api_key' environment variable.");
-  }
-
-  if (!Client) {
-    throw new Error("Google GenAI Client failed to import. Check package exports.");
+    throw new Error("Missing 'VERTEX_API_KEY' environment variable.");
   }
   
-  // Initialize with explicit vertexai: true AND apiKey
+  if (!Client) {
+    throw new Error(`Google GenAI Client class not found. Available exports: ${Object.keys(genaiModule).join(", ")}`);
+  }
+
+  // 2. Configure Environment Variables for the SDK
+  // STRICTLY following user's request:
+  // - Use Environment Variables for configuration
+  // - Use No-Arg constructor (only httpOptions)
+  // - Enable Vertex AI mode
+  
+  // Map our "VERTEX_API_KEY" to the SDK's expected "GEMINI_API_KEY" / "GOOGLE_API_KEY"
+  Deno.env.set("GEMINI_API_KEY", apiKey);
+  Deno.env.set("GOOGLE_API_KEY", apiKey); // Set both to be safe
+  
+  // Enable Vertex AI Mode as requested
+  Deno.env.set("GOOGLE_GENAI_USE_VERTEXAI", "true");
+  
+  // Vertex AI requires Project ID and Location
+  if (projectId) {
+      Deno.env.set("GOOGLE_CLOUD_PROJECT", projectId);
+      Deno.env.set("GCLOUD_PROJECT", projectId);
+  }
+  
+  // Default location if not set (Required for Vertex)
+  if (!Deno.env.get("GOOGLE_CLOUD_LOCATION")) {
+      Deno.env.set("GOOGLE_CLOUD_LOCATION", "us-central1");
+  }
+
+  console.log(`Initializing Client with Env Vars: VERTEX_AI=true, Project=${projectId || 'unknown'}, Region=us-central1`);
+
+  // 3. Initialize Client WITHOUT manual params (except API version)
+  // The SDK will read GEMINI_API_KEY and GOOGLE_GENAI_USE_VERTEXAI from env.
   return new Client({
-    vertexai: true,
-    apiKey: apiKey,
     httpOptions: { apiVersion: 'v1beta' }
   });
 }
 
-// Health check
 app.get("/make-server-f359b1dc/health", (c) => {
   return c.json({ status: "ok" });
 });
 
-// Analyze image
 app.post("/make-server-f359b1dc/analyze-image", async (c) => {
   try {
     const { image, location, character } = await c.req.json();
@@ -68,7 +91,7 @@ app.post("/make-server-f359b1dc/analyze-image", async (c) => {
       return c.json({ error: "Image is required" }, 400);
     }
 
-    console.log("Starting image analysis with Gemini SDK...");
+    console.log("Starting image analysis...");
     const client = getClient();
     
     const base64Image = image.replace(/^data:image\/\w+;base64,/, "");
@@ -91,10 +114,28 @@ app.post("/make-server-f359b1dc/analyze-image", async (c) => {
       parts.push({ inlineData: { mimeType: "image/jpeg", data: charBase64 } });
     }
 
-    const response = await client.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: [{ role: "user", parts: parts }]
-    });
+    // Fallback logic
+    let response;
+    try {
+        console.log("Attempting to use model: gemini-3-pro-preview");
+        response = await client.models.generateContent({
+          model: "gemini-3-pro-preview",
+          contents: [{ role: "user", parts: parts }]
+        });
+    } catch (e: any) {
+        console.warn(`Primary model failed: ${e.message}.`);
+        // Check for common Vertex errors to give better feedback
+        if (e.message?.includes("API keys are not supported")) {
+            console.error("CRITICAL: Vertex AI does not support API Keys for this endpoint. User needs to disable Vertex mode or use OAuth.");
+        }
+
+        // Try fallback
+        console.log("Falling back to gemini-2.0-flash-exp");
+        response = await client.models.generateContent({
+          model: "gemini-2.0-flash-exp",
+          contents: [{ role: "user", parts: parts }]
+        });
+    }
 
     const description = response.text || 
                         response.candidates?.[0]?.content?.parts?.[0]?.text || 
@@ -109,18 +150,24 @@ app.post("/make-server-f359b1dc/analyze-image", async (c) => {
   }
 });
 
-// Generate creative element
 app.post("/make-server-f359b1dc/generate-creative-element", async (c) => {
   try {
     const { description } = await c.req.json();
-    
     const client = getClient();
     const prompt = `基于以下场景描述，请添加一个脑洞大开、富有创意和想象力的元素... (省略长提示) ... 原始描述: ${description}`;
 
-    const response = await client.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
-    });
+    let response;
+    try {
+        response = await client.models.generateContent({
+          model: "gemini-3-pro-preview",
+          contents: [{ role: "user", parts: [{ text: prompt }] }]
+        });
+    } catch (e: any) {
+        response = await client.models.generateContent({
+          model: "gemini-2.0-flash-exp",
+          contents: [{ role: "user", parts: [{ text: prompt }] }]
+        });
+    }
 
     const creativeElement = (response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
     return c.json({ creativeElement });
@@ -130,11 +177,10 @@ app.post("/make-server-f359b1dc/generate-creative-element", async (c) => {
   }
 });
 
-// Generate image
 app.post("/make-server-f359b1dc/generate-image", async (c) => {
   try {
     const { description, originalImage, mode, character, userPrompt } = await c.req.json();
-    console.log("Generating image with Gemini SDK... Mode:", mode);
+    console.log("Generating image... Mode:", mode);
     const client = getClient();
 
     let promptText = mode === 'creative' 
@@ -166,7 +212,6 @@ app.post("/make-server-f359b1dc/generate-image", async (c) => {
       });
     }
 
-    // Config following user snippet
     const config: any = {
       responseModalities: ["IMAGE"], 
       safetySettings: [
@@ -177,8 +222,9 @@ app.post("/make-server-f359b1dc/generate-image", async (c) => {
       ]
     };
 
+    // Using requested model
     const response = await client.models.generateContent({
-      model: "gemini-3-pro-image-preview",
+      model: "gemini-3-pro-image-preview", 
       contents: [{ role: "user", parts: parts }],
       config: config
     });
@@ -209,9 +255,7 @@ app.post("/make-server-f359b1dc/generate-image", async (c) => {
   }
 });
 
-// History endpoints omitted for brevity (same as before)
-// ... (History endpoints: get, save, delete)
-
+// History endpoints
 app.get("/make-server-f359b1dc/get-history", async (c) => {
   try {
     const historyData = await kv.get("camera_history");
@@ -250,7 +294,6 @@ app.post("/make-server-f359b1dc/delete-history", async (c) => {
 });
 
 
-// Speech to Text
 app.post("/make-server-f359b1dc/speech-to-text", async (c) => {
   try {
     const { audio } = await c.req.json();
