@@ -3,19 +3,15 @@ import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
 // Create and configure the GenAI client
 export function getGenAIClient() {
   const apiKey = process.env.VERTEX_API_KEY || process.env.GEMINI_API_KEY;
-  const projectId = process.env.VERTEX_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
-  const location = process.env.GOOGLE_CLOUD_LOCATION || 'global';
 
   if (!apiKey) {
     throw new Error('Missing VERTEX_API_KEY or GEMINI_API_KEY environment variable');
   }
 
-  console.log(`Initializing GenAI Client: vertexai=true, project=${projectId || 'unknown'}, location=${location}`);
+  console.log('Initializing GenAI Client with API Key');
 
+  // 使用 API Key 模式（不使用 Vertex AI）
   return new GoogleGenAI({
-    vertexai: true,
-    project: projectId,
-    location: location,
     apiKey: apiKey,
   });
 }
