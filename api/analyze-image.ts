@@ -49,22 +49,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parts.push({ inlineData: { mimeType: 'image/jpeg', data: charBase64 } });
     }
 
-    // 使用支持视觉的模型
-    let model;
-    let result;
-    
+    // 使用 client.models.generateContent() 调用方式
+    let response;
     try {
-      console.log('Attempting to use model: gemini-1.5-flash');
-      model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      result = await model.generateContent(parts);
+      console.log('Attempting to use model: gemini-2.5-flash');
+      response = await client.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts }],
+      });
     } catch (e: any) {
       console.warn(`Primary model failed: ${e.message}`);
-      console.log('Falling back to gemini-1.5-pro');
-      model = client.getGenerativeModel({ model: 'gemini-1.5-pro' });
-      result = await model.generateContent(parts);
+      console.log('Falling back to gemini-2.0-flash');
+      response = await client.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: [{ role: 'user', parts }],
+      });
     }
 
-    const description = result.response.text();
+    const description = extractText(response);
     console.log('Analysis complete. Length:', description.length);
 
     return res.status(200).json({ description });

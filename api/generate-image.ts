@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getGenAIClient, safetySettings } from './lib/genai';
+import { getGenAIClient, safetySettings, extractImage, HarmCategory, HarmBlockThreshold } from './lib/genai';
 
 export const config = {
   maxDuration: 120,
@@ -62,56 +62,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 使用 Imagen 3 或支持图像生成的模型
-    // 注意：gemini-1.5 系列不支持图像生成，需要使用 imagen 模型
-    // 但 imagen 需要特殊的 API 调用方式
-    
-    // 临时方案：使用 Gemini 生成详细的图像描述，然后返回原图
-    // TODO: 集成真正的图像生成 API（如 DALL-E, Stable Diffusion 等）
-    
-    const model = client.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
-      safetySettings,
+    // 使用支持图像生成的模型
+    const response = await client.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: [{ role: 'user', parts }],
+      config: {
+        responseModalities: ['IMAGE', 'TEXT'],
+        safetySettings: [
+          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ],
+      },
     });
 
-    // 生成增强的图像描述
-    const enhancedPrompt = `Based on the following scene, create a detailed visual description that could be used to generate an image:
+    const generatedImageBase64 = extractImage(response);
 
-Original description: ${description}
-Mode: ${mode === 'creative' ? 'Creative and imaginative' : 'Realistic'}
-${userPrompt ? `User request: ${userPrompt}` : ''}
-
-Please provide a rich, detailed visual description in English that captures the essence of this scene.`;
-
-    const result = await model.generateContent(enhancedPrompt);
-    const enhancedDescription = result.response.text();
-
-    console.log('Enhanced description generated');
-
-    // 由于 Google AI Studio 的 API Key 模式不支持 Imagen
-    // 返回原图并附上增强描述（可以后续集成其他图像生成服务）
-    
-    // 如果有原图，返回原图；否则返回一个占位图
-    let imageToReturn = originalImage;
-    
-    if (!imageToReturn && character?.referenceImage) {
-      imageToReturn = character.referenceImage;
-    }
-
-    if (!imageToReturn) {
-      // 返回一个简单的 placeholder 提示
+    if (!generatedImageBase64) {
+      // 如果没有生成图像，返回原图
+      console.log('No image generated, returning original');
       return res.status(200).json({
         success: true,
-        image: null,
-        description: enhancedDescription,
-        note: '图像生成功能需要配置额外的图像生成服务（如 DALL-E、Stable Diffusion 等）',
+        image: originalImage || (character?.referenceImage) || null,
+        description: description,
       });
     }
 
     return res.status(200).json({
       success: true,
-      image: imageToReturn,
-      description: enhancedDescription,
+      image: `data:image/png;base64,${generatedImageBase64}`,
+      description: description,
     });
 
   } catch (error: any) {

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getGenAIClient } from './lib/genai';
+import { getGenAIClient, extractText } from './lib/genai';
 
 export const config = {
   maxDuration: 60,
@@ -32,10 +32,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 原始描述: ${description}`;
 
-    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const result = await model.generateContent(prompt);
-    const creativeElement = result.response.text().trim();
+    const response = await client.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
 
+    const creativeElement = extractText(response).trim();
     return res.status(200).json({ creativeElement });
   } catch (error: any) {
     console.error('Error generating creative element:', error);

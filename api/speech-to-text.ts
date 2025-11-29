@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getGenAIClient } from './lib/genai';
+import { getGenAIClient, extractText } from './lib/genai';
 
 export const config = {
   maxDuration: 60,
@@ -29,14 +29,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('🎤 Starting speech recognition...');
     const client = getGenAIClient();
 
-    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    
-    const result = await model.generateContent([
-      { text: '请将这段音频转换为文字。只输出识别出的文字内容，不要添加任何其他说明。如果是中文，请输出中文。' },
-      { inlineData: { mimeType: 'audio/webm', data: audio } },
-    ]);
+    const response = await client.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{
+        role: 'user',
+        parts: [
+          { text: '请将这段音频转换为文字。只输出识别出的文字内容，不要添加任何其他说明。如果是中文，请输出中文。' },
+          { inlineData: { mimeType: 'audio/webm', data: audio } },
+        ],
+      }],
+    });
 
-    const text = result.response.text().trim();
+    const text = extractText(response).trim();
     console.log('📝 STT Result:', text.substring(0, 50));
 
     return res.status(200).json({ text });
