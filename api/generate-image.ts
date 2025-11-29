@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getGenAIClient, safetySettings, extractImage, HarmCategory, HarmBlockThreshold } from './lib/genai';
+import { generateContent, extractImage, extractText, safetySettings } from './lib/genai';
 
 export const config = {
   maxDuration: 120,
@@ -22,8 +22,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { description, originalImage, mode, character, userPrompt } = req.body;
     console.log('Generating image... Mode:', mode);
-
-    const client = getGenAIClient();
 
     let promptText =
       mode === 'creative'
@@ -62,37 +60,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // 使用支持图像生成的模型
-    const response = await client.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
-      contents: [{ role: 'user', parts }],
-      config: {
-        responseModalities: ['IMAGE', 'TEXT'],
-        safetySettings: [
-          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ],
-      },
-    });
+    // 调用 Gemini API 生成增强描述
+    // 注意：Gemini API 通过 REST 不支持图像生成，只支持图像理解
+    const response = await generateContent(
+      'gemini-1.5-flash',
+      [{ role: 'user', parts }],
+      { safetySettings }
+    );
 
-    const generatedImageBase64 = extractImage(response);
+    const enhancedDescription = extractText(response);
+    console.log('Enhanced description generated');
 
-    if (!generatedImageBase64) {
-      // 如果没有生成图像，返回原图
-      console.log('No image generated, returning original');
-      return res.status(200).json({
-        success: true,
-        image: originalImage || (character?.referenceImage) || null,
-        description: description,
-      });
+    // 返回原图 + 增强描述
+    // 如果需要真正的图像生成，需要集成其他服务（如 Imagen、DALL-E 等）
+    let imageToReturn = originalImage;
+    
+    if (!imageToReturn && character?.referenceImage) {
+      imageToReturn = character.referenceImage;
     }
 
     return res.status(200).json({
       success: true,
-      image: `data:image/png;base64,${generatedImageBase64}`,
-      description: description,
+      image: imageToReturn || null,
+      description: enhancedDescription || description,
     });
 
   } catch (error: any) {

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getGenAIClient, extractText } from './lib/genai';
+import { generateContent, extractText } from './lib/genai';
 
 export const config = {
   maxDuration: 60,
@@ -27,7 +27,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     console.log('Starting image analysis...');
-    const client = getGenAIClient();
 
     const base64Image = image.replace(/^data:image\/\w+;base64,/, '');
 
@@ -49,21 +48,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parts.push({ inlineData: { mimeType: 'image/jpeg', data: charBase64 } });
     }
 
-    // 使用 client.models.generateContent() 调用方式
+    // 直接调用 REST API
     let response;
     try {
-      console.log('Attempting to use model: gemini-2.5-flash');
-      response = await client.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [{ role: 'user', parts }],
-      });
+      console.log('Attempting to use model: gemini-1.5-flash');
+      response = await generateContent('gemini-1.5-flash', [{ role: 'user', parts }]);
     } catch (e: any) {
       console.warn(`Primary model failed: ${e.message}`);
-      console.log('Falling back to gemini-2.0-flash');
-      response = await client.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [{ role: 'user', parts }],
-      });
+      console.log('Falling back to gemini-1.5-pro');
+      response = await generateContent('gemini-1.5-pro', [{ role: 'user', parts }]);
     }
 
     const description = extractText(response);
