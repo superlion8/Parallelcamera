@@ -13,6 +13,7 @@ export async function speechToText(audioBase64: string): Promise<string> {
     // 1. Retrieve Secrets
     const apiKey = Deno.env.get("vertex_api_key") || Deno.env.get("VERTEX_API_KEY");
     const projectId = Deno.env.get("vertex_project_id") || Deno.env.get("VERTEX_PROJECT_ID");
+    const location = Deno.env.get("GOOGLE_CLOUD_LOCATION") || "global";
 
     if (!apiKey) {
       throw new Error("Missing 'VERTEX_API_KEY' environment variable.");
@@ -23,25 +24,14 @@ export async function speechToText(audioBase64: string): Promise<string> {
         throw new Error("Google GenAI Client class not found in package exports.");
     }
 
-    // 2. Configure Environment Variables (Strict adherence to user request)
-    Deno.env.set("GEMINI_API_KEY", apiKey);
-    Deno.env.set("GOOGLE_API_KEY", apiKey);
-    Deno.env.set("GOOGLE_GENAI_USE_VERTEXAI", "true");
-    
-    if (projectId) {
-      Deno.env.set("GOOGLE_CLOUD_PROJECT", projectId);
-      Deno.env.set("GCLOUD_PROJECT", projectId);
-    }
-    
-    if (!Deno.env.get("GOOGLE_CLOUD_LOCATION")) {
-      Deno.env.set("GOOGLE_CLOUD_LOCATION", "us-central1");
-    }
+    console.log(`Initializing STT Client: vertexai=true, project=${projectId || 'unknown'}, location=${location}`);
 
-    console.log(`Initializing STT Client with Env Vars: VERTEX_AI=true`);
-
-    // 3. Initialize Client WITHOUT manual params
+    // 2. Initialize Client with explicit parameters (per official docs)
     const client = new Client({
-        httpOptions: { apiVersion: "v1beta" }
+        vertexai: true,
+        project: projectId,
+        location: location,
+        apiKey: apiKey,
     });
 
     // Call Gemini

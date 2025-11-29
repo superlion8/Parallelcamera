@@ -37,6 +37,7 @@ function getClient() {
   // 1. Retrieve Secrets
   const apiKey = Deno.env.get("vertex_api_key") || Deno.env.get("VERTEX_API_KEY");
   const projectId = Deno.env.get("vertex_project_id") || Deno.env.get("VERTEX_PROJECT_ID");
+  const location = Deno.env.get("GOOGLE_CLOUD_LOCATION") || "global";
   
   if (!apiKey) {
     throw new Error("Missing 'VERTEX_API_KEY' environment variable.");
@@ -46,36 +47,15 @@ function getClient() {
     throw new Error(`Google GenAI Client class not found. Available exports: ${Object.keys(genaiModule).join(", ")}`);
   }
 
-  // 2. Configure Environment Variables for the SDK
-  // STRICTLY following user's request:
-  // - Use Environment Variables for configuration
-  // - Use No-Arg constructor (only httpOptions)
-  // - Enable Vertex AI mode
-  
-  // Map our "VERTEX_API_KEY" to the SDK's expected "GEMINI_API_KEY" / "GOOGLE_API_KEY"
-  Deno.env.set("GEMINI_API_KEY", apiKey);
-  Deno.env.set("GOOGLE_API_KEY", apiKey); // Set both to be safe
-  
-  // Enable Vertex AI Mode as requested
-  Deno.env.set("GOOGLE_GENAI_USE_VERTEXAI", "true");
-  
-  // Vertex AI requires Project ID and Location
-  if (projectId) {
-      Deno.env.set("GOOGLE_CLOUD_PROJECT", projectId);
-      Deno.env.set("GCLOUD_PROJECT", projectId);
-  }
-  
-  // Default location if not set (Required for Vertex)
-  if (!Deno.env.get("GOOGLE_CLOUD_LOCATION")) {
-      Deno.env.set("GOOGLE_CLOUD_LOCATION", "us-central1");
-  }
+  console.log(`Initializing Client: vertexai=true, project=${projectId || 'unknown'}, location=${location}`);
 
-  console.log(`Initializing Client with Env Vars: VERTEX_AI=true, Project=${projectId || 'unknown'}, Region=us-central1`);
-
-  // 3. Initialize Client WITHOUT manual params (except API version)
-  // The SDK will read GEMINI_API_KEY and GOOGLE_GENAI_USE_VERTEXAI from env.
+  // 2. Initialize Client with explicit parameters (per official docs)
+  // https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstart
   return new Client({
-    httpOptions: { apiVersion: 'v1beta' }
+    vertexai: true,
+    project: projectId,
+    location: location,
+    apiKey: apiKey,
   });
 }
 
