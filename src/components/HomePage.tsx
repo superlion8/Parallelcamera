@@ -12,10 +12,9 @@ interface HomePageProps {
   session: Session | null;
   onLogin: () => void;
   onLogout: () => void;
-  debugInfo?: string;
 }
 
-export function HomePage({ onStartCamera, history, onDeleteHistory, session, onLogin, onLogout, debugInfo }: HomePageProps) {
+export function HomePage({ onStartCamera, history, onDeleteHistory, session, onLogin, onLogout }: HomePageProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [showCharacterManager, setShowCharacterManager] = useState(false);
 
@@ -103,14 +102,6 @@ export function HomePage({ onStartCamera, history, onDeleteHistory, session, onL
               </div>
             </div>
 
-            {/* Debug Info */}
-            {debugInfo && (
-              <div className="mt-8 p-4 bg-red-900/50 border border-red-500/50 rounded-xl max-w-md w-full overflow-x-auto">
-                <p className="text-red-200 text-xs font-mono whitespace-pre-wrap break-all text-left">
-                  {debugInfo}
-                </p>
-              </div>
-            )}
           </div>
         ) : (
           /* Feed - BeReal style */

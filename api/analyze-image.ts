@@ -52,9 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 使用 client.models.generateContent 调用
     let response;
     try {
-      console.log('Attempting to use model: gemini-2.5-flash');
+      console.log('Attempting to use model: gemini-3-pro-preview');
       response = await client.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-pro-preview',
         contents: [{ role: 'user', parts }],
         config: {
           safetySettings,
@@ -62,9 +62,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     } catch (e: any) {
       console.warn(`Primary model failed: ${e.message}`);
-      console.log('Falling back to gemini-2.0-flash');
+      console.log('Falling back to gemini-2.5-flash');
       response = await client.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts }],
         config: {
           safetySettings,

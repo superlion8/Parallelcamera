@@ -67,27 +67,18 @@ export default function App() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
 
-  // Auth handling
-  const [debugInfo, setDebugInfo] = useState<string>('');
-
   useEffect(() => {
-    // Capture initial URL
-    setDebugInfo(`Initial URL: ${window.location.href}`);
-
     // 1. Initial Session Check (Crucial for OAuth callback)
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
         console.error('Error checking initial session:', error);
-        setDebugInfo(prev => prev + `\nInitial Session Error: ${error.message}`);
       } else if (session) {
         console.log('Initial session found:', session.user.email);
         setSession(session);
-        setDebugInfo(prev => prev + `\nInitial Session Found: ${session.user.email}`);
         // Clean URL if we have a session (likely from OAuth)
         window.history.replaceState({}, '', window.location.pathname);
       } else {
         console.log('No initial session.');
-        setDebugInfo(prev => prev + '\nNo initial session found.');
       }
     });
 
@@ -99,19 +90,13 @@ export default function App() {
       
       // ALWAYS update session state, whether it's null or a valid session
       setSession(session);
-
-      if (session) {
-         setDebugInfo(prev => prev + `\nAuth Event (${_event}): Success! User: ${session.user.email}`);
-      } else {
-         setDebugInfo(prev => prev + `\nAuth Event (${_event}): No Session`);
-      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const handleLogin = async () => {
-    console.log('Starting login using HARDCODED redirect...');
+    console.log('Starting Google login...');
     
     // Check LocalStorage support
     try {
@@ -122,11 +107,8 @@ export default function App() {
       return;
     }
 
-    // EXPLICITLY use the trailing slash version.
-    // This prevents the server from 301 redirecting and stripping query params.
-    const redirectUrl = 'https://chorus-poker-31416733.figma.site/';
-    
-    setDebugInfo(`Initiating login...\nRedirect URL: ${redirectUrl}`);
+    // 使用当前页面作为 redirect URL
+    const redirectUrl = window.location.origin + window.location.pathname;
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -142,7 +124,6 @@ export default function App() {
     if (error) {
       console.error('Login error:', error);
       alert('登录失败: ' + error.message);
-      setDebugInfo(prev => prev + '\nLogin Error: ' + error.message);
     }
   };
 
@@ -205,11 +186,11 @@ export default function App() {
   };
 
   const handleStartCamera = () => {
-    // Bypass login check
-    // if (!session) {
-    //   handleLogin();
-    //   return;
-    // }
+    // 需要登录才能使用相机
+    if (!session) {
+      handleLogin();
+      return;
+    }
     setAppState('camera');
   };
 
@@ -261,10 +242,9 @@ export default function App() {
           onStartCamera={handleStartCamera}
           history={history}
           onDeleteHistory={deleteFromHistory}
-          session={session || { user: { email: 'guest@example.com' } } as any}
+          session={session}
           onLogin={handleLogin}
           onLogout={handleLogout}
-          debugInfo={debugInfo}
         />
       )}
       {appState === 'camera' && (

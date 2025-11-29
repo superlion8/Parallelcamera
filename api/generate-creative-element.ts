@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 原始描述: ${description}`;
 
     const response = await client.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-pro-preview',
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         safetySettings,
