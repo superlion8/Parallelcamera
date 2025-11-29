@@ -1,91 +1,88 @@
-// 直接使用 Gemini REST API，不依赖 SDK
-// API 文档: https://ai.google.dev/api/rest
+/**
+ * Vertex AI Gemini API 工具函数
+ * 使用 @google/genai SDK (API Key + Vertex AI 端点)
+ * 
+ * 参考: https://github.com/superlion8/sparkit/blob/main/lib/vertexai.ts
+ *
+ * 环境变量配置：
+ * - GEMINI_API_KEY: Google Cloud API Key
+ * - GOOGLE_GENAI_USE_VERTEXAI=true: 启用 Vertex AI 端点 (自动设置)
+ */
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
 
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+// 关键：在模块加载时设置 Vertex AI 模式环境变量
+if (!process.env.GOOGLE_GENAI_USE_VERTEXAI) {
+  process.env.GOOGLE_GENAI_USE_VERTEXAI = "true";
+}
 
-export function getApiKey(): string {
+// GenAI 客户端缓存（单例）
+let genAIClient: GoogleGenAI | null = null;
+
+// 获取 API Key
+function getApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY || process.env.VERTEX_API_KEY;
   if (!apiKey) {
-    throw new Error('Missing GEMINI_API_KEY environment variable');
+    throw new Error("GEMINI_API_KEY environment variable is required");
   }
   return apiKey;
 }
 
-// 直接调用 Gemini API
-export async function generateContent(
-  model: string,
-  contents: any[],
-  config?: any
-): Promise<any> {
-  const apiKey = getApiKey();
-  const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${apiKey}`;
-
-  const body: any = { contents };
-  
-  if (config?.safetySettings) {
-    body.safetySettings = config.safetySettings;
+// 获取 GenAI 客户端（单例）- 使用 Vertex AI 端点
+export function getGenAIClient(): GoogleGenAI {
+  if (!genAIClient) {
+    const apiKey = getApiKey();
+    genAIClient = new GoogleGenAI({
+      apiKey,
+      // Vertex AI 模式通过环境变量 GOOGLE_GENAI_USE_VERTEXAI=true 自动启用
+    });
   }
-  
-  if (config?.generationConfig) {
-    body.generationConfig = config.generationConfig;
-  }
-
-  console.log(`Calling Gemini API: ${model}`);
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Gemini API Error:', error);
-    throw new Error(`Gemini API Error: ${response.status} - ${error}`);
-  }
-
-  const data = await response.json();
-  return data;
+  return genAIClient;
 }
+
+// 安全设置配置
+export const safetySettings = [
+  {
+    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+];
 
 // Helper to extract text from response
 export function extractText(response: any): string {
-  return response?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const candidate = response.candidates?.[0];
+  if (candidate?.finishReason === "SAFETY") {
+    throw new Error("内容被安全过滤阻止");
+  }
+  return candidate?.content?.parts?.[0]?.text || response.text || '';
 }
 
 // Helper to extract image from response
 export function extractImage(response: any): string | null {
-  const parts = response?.candidates?.[0]?.content?.parts;
-  if (parts) {
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        return part.inlineData.data;
+  const candidate = response.candidates?.[0];
+  if (candidate?.finishReason === "SAFETY") {
+    throw new Error("内容被安全过滤阻止，请尝试调整提示词或图片");
+  }
+  
+  if (candidate?.content?.parts) {
+    for (const part of candidate.content.parts) {
+      if ((part as any).inlineData?.data) {
+        return (part as any).inlineData.data;
       }
     }
   }
   return null;
 }
 
-// Safety settings
-export const HarmCategory = {
-  HARM_CATEGORY_HARASSMENT: 'HARM_CATEGORY_HARASSMENT',
-  HARM_CATEGORY_HATE_SPEECH: 'HARM_CATEGORY_HATE_SPEECH',
-  HARM_CATEGORY_SEXUALLY_EXPLICIT: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-  HARM_CATEGORY_DANGEROUS_CONTENT: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-};
-
-export const HarmBlockThreshold = {
-  BLOCK_NONE: 'BLOCK_NONE',
-  BLOCK_LOW_AND_ABOVE: 'BLOCK_LOW_AND_ABOVE',
-  BLOCK_MEDIUM_AND_ABOVE: 'BLOCK_MEDIUM_AND_ABOVE',
-  BLOCK_ONLY_HIGH: 'BLOCK_ONLY_HIGH',
-};
-
-export const safetySettings = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-];
+export { HarmCategory, HarmBlockThreshold };

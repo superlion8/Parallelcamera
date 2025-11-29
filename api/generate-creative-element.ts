@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { generateContent, extractText } from './lib/genai';
+import { getGenAIClient, extractText, safetySettings } from './lib/genai';
 
 export const config = {
   maxDuration: 60,
@@ -21,6 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { description } = req.body;
+    const client = getGenAIClient();
 
     const prompt = `基于以下场景描述，请添加一个脑洞大开、富有创意和想象力的元素。这个元素应该：
 1. 与原场景形成有趣的对比或融合
@@ -31,9 +32,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 原始描述: ${description}`;
 
-    const response = await generateContent('gemini-1.5-flash', [
-      { role: 'user', parts: [{ text: prompt }] }
-    ]);
+    const response = await client.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        safetySettings,
+      },
+    });
 
     const creativeElement = extractText(response).trim();
     return res.status(200).json({ creativeElement });
