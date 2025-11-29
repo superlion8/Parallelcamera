@@ -1,38 +1,19 @@
-// 使用 @google/genai 包调用 Vertex AI
-// 参考文档: https://cloud.google.com/vertex-ai/generative-ai/docs/start/quickstart?usertype=apikey
-
-// 注意：需要设置以下环境变量：
-// - GEMINI_API_KEY: API 密钥
-// - GOOGLE_GENAI_USE_VERTEXAI: true (启用 Vertex AI 模式)
+// 使用 @google/genai 包 - 纯 API Key 模式（不使用 Vertex AI）
 
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
 
-// 在模块加载时设置环境变量（Vercel Serverless 需要这样做）
-function setupEnvironment() {
+// Create and configure the GenAI client
+export function getGenAIClient() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.VERTEX_API_KEY;
   
   if (!apiKey) {
     throw new Error('Missing GEMINI_API_KEY environment variable');
   }
   
-  // 设置 SDK 需要的环境变量
-  process.env.GEMINI_API_KEY = apiKey;
-  process.env.GOOGLE_GENAI_USE_VERTEXAI = 'true';
-  
-  console.log('Environment configured for Vertex AI with API Key');
-}
+  console.log('Initializing GoogleGenAI Client with API Key (non-Vertex mode)');
 
-// Create and configure the GenAI client
-export function getGenAIClient() {
-  setupEnvironment();
-  
-  console.log('Initializing GoogleGenAI Client (Vertex AI mode via env vars)');
-
-  // 根据官方文档：使用无参构造函数，SDK 会从环境变量读取配置
-  // HTTPOptions 设置 API 版本
-  return new GoogleGenAI({
-    httpOptions: { apiVersion: 'v1' }
-  });
+  // 直接传入 API Key，不使用 Vertex AI 模式
+  return new GoogleGenAI({ apiKey });
 }
 
 // Export safety settings for image generation
