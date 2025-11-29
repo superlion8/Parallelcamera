@@ -243,18 +243,14 @@ export function MetaPromptView({ capturedData, onConfirm, onBack }: MetaPromptVi
           
           try {
             // 调用后端API
-            const { projectId, publicAnonKey } = await import('../utils/supabase/info');
-            const response = await fetch(
-              `https://${projectId}.supabase.co/functions/v1/make-server-f359b1dc/speech-to-text`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${publicAnonKey}`
-                },
-                body: JSON.stringify({ audio: base64Audio })
-              }
-            );
+            const { API_ENDPOINTS } = await import('../utils/api');
+            const response = await fetch(API_ENDPOINTS.speechToText, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ audio: base64Audio })
+            });
             
             if (!response.ok) {
               throw new Error(`识别失败: ${response.status}`);

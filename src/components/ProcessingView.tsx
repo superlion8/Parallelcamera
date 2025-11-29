@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { CapturedData, GeneratedResult } from '../App';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { API_ENDPOINTS } from '../utils/api';
 import * as characterDB from '../utils/characterDB';
 
 interface ProcessingViewProps {
@@ -36,28 +36,25 @@ export function ProcessingView({ capturedData, onComplete, onCancel }: Processin
       // Step 1: Analyze (Meta 模式不带用户 prompt，只客观描述)
       setCurrentStep(1);
       setStatusText(isMetaMode ? '正在分析环境...' : (capturedData.character ? `正在分析照片（含角色 ${capturedData.character.name}）...` : '正在分析照片...'));
-      const analyzeResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-f359b1dc/analyze-image`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({
-            image: capturedData.image,
-            location: capturedData.location,
-            // Meta 模式不传角色给 VLM，只客观描述环境
-            character: isMetaMode ? undefined : (capturedData.character ? {
-              name: capturedData.character.name,
-              referenceImage: capturedData.character.referenceImage,
-            } : undefined),
-          }),
-        }
-      );
+      const analyzeResponse = await fetch(API_ENDPOINTS.analyzeImage, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: capturedData.image,
+          location: capturedData.location,
+          // Meta 模式不传角色给 VLM，只客观描述环境
+          character: isMetaMode ? undefined : (capturedData.character ? {
+            name: capturedData.character.name,
+            referenceImage: capturedData.character.referenceImage,
+          } : undefined),
+        }),
+      });
 
       if (!analyzeResponse.ok) {
-        throw new Error('Failed to analyze image');
+        const errorData = await analyzeResponse.json().catch(() => ({}));
+        throw new Error(errorData.details || 'Failed to analyze image');
       }
 
       const analyzeData = await analyzeResponse.json();
@@ -66,26 +63,23 @@ export function ProcessingView({ capturedData, onComplete, onCancel }: Processin
         // META MODE: 根据用户输入生成角色在环境中的照片
         setCurrentStep(2);
         setStatusText('正在生成 Meta 照片...');
-        const metaResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-f359b1dc/generate-image`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${publicAnonKey}`,
-            },
-            body: JSON.stringify({
-              description: analyzeData.description, // 环境描述
-              userPrompt: capturedData.userPrompt, // 用户输入
-              originalImage: capturedData.image, // 原始环境图
-              mode: 'meta',
-              character: capturedData.character, // 角色数据
-            }),
-          }
-        );
+        const metaResponse = await fetch(API_ENDPOINTS.generateImage, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description: analyzeData.description, // 环境描述
+            userPrompt: capturedData.userPrompt, // 用户输入
+            originalImage: capturedData.image, // 原始环境图
+            mode: 'meta',
+            character: capturedData.character, // 角色数据
+          }),
+        });
 
         if (!metaResponse.ok) {
-          throw new Error('Failed to generate meta image');
+          const errorData = await metaResponse.json().catch(() => ({}));
+          throw new Error(errorData.details || 'Failed to generate meta image');
         }
 
         const metaData = await metaResponse.json();
@@ -113,23 +107,20 @@ export function ProcessingView({ capturedData, onComplete, onCancel }: Processin
         setCurrentStep(2);
         setStatusText('正在构思创意...');
         
-        const creativeResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-f359b1dc/generate-creative-element`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${publicAnonKey}`,
-            },
-            body: JSON.stringify({
-              description: analyzeData.description,
-              location: capturedData.location,
-            }),
-          }
-        );
+        const creativeResponse = await fetch(API_ENDPOINTS.generateCreativeElement, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description: analyzeData.description,
+            location: capturedData.location,
+          }),
+        });
 
         if (!creativeResponse.ok) {
-          throw new Error('Failed to generate creative element');
+          const errorData = await creativeResponse.json().catch(() => ({}));
+          throw new Error(errorData.details || 'Failed to generate creative element');
         }
 
         const creativeData = await creativeResponse.json();
@@ -138,27 +129,24 @@ export function ProcessingView({ capturedData, onComplete, onCancel }: Processin
         // Step 3: Generate
         setCurrentStep(3);
         setStatusText('正在生成平行世界...');
-        const generateResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-f359b1dc/generate-image`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${publicAnonKey}`,
-            },
-            body: JSON.stringify({
-              description: analyzeData.description + '\n\n' + creativeElementText,
-              location: capturedData.location,
-              mode: 'creative',
-              creativeElement: creativeElementText,
-              originalImage: capturedData.image,
-              character: capturedData.character, // 传递角色数据
-            }),
-          }
-        );
+        const generateResponse = await fetch(API_ENDPOINTS.generateImage, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description: analyzeData.description + '\n\n' + creativeElementText,
+            location: capturedData.location,
+            mode: 'creative',
+            creativeElement: creativeElementText,
+            originalImage: capturedData.image,
+            character: capturedData.character, // 传递角色数据
+          }),
+        });
 
         if (!generateResponse.ok) {
-          throw new Error('Failed to generate image');
+          const errorData = await generateResponse.json().catch(() => ({}));
+          throw new Error(errorData.details || 'Failed to generate image');
         }
 
         const generateData = await generateResponse.json();
@@ -187,26 +175,23 @@ export function ProcessingView({ capturedData, onComplete, onCancel }: Processin
         // Step 2: Generate
         setCurrentStep(2);
         setStatusText('正在生成平行世界...');
-        const generateResponse = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-f359b1dc/generate-image`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${publicAnonKey}`,
-            },
-            body: JSON.stringify({
-              description: analyzeData.description,
-              location: capturedData.location,
-              mode: 'realistic',
-              originalImage: undefined,
-              character: capturedData.character, // 传递角色数据
-            }),
-          }
-        );
+        const generateResponse = await fetch(API_ENDPOINTS.generateImage, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            description: analyzeData.description,
+            location: capturedData.location,
+            mode: 'realistic',
+            originalImage: undefined,
+            character: capturedData.character, // 传递角色数据
+          }),
+        });
 
         if (!generateResponse.ok) {
-          throw new Error('Failed to generate image');
+          const errorData = await generateResponse.json().catch(() => ({}));
+          throw new Error(errorData.details || 'Failed to generate image');
         }
 
         const generateData = await generateResponse.json();
@@ -230,9 +215,9 @@ export function ProcessingView({ capturedData, onComplete, onCancel }: Processin
         }, 500);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Processing error:', error);
-      alert('处理失败，请重试');
+      alert(`处理失败: ${error.message || '请重试'}`);
       onCancel();
     }
   };
