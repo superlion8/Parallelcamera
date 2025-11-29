@@ -107,17 +107,14 @@ export default function App() {
       return;
     }
 
-    // 使用当前页面作为 redirect URL
-    const redirectUrl = window.location.origin + window.location.pathname;
+    // 使用当前页面 origin 作为 redirect URL（不带路径）
+    const redirectUrl = window.location.origin;
+    console.log('Redirect URL:', redirectUrl);
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
       },
     });
     
